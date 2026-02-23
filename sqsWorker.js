@@ -3,7 +3,7 @@ import {
   SQSClient,
   ReceiveMessageCommand,
   DeleteMessageCommand,
-  DeleteMessageAllCommand,
+  PurgeQueueCommand, // ✅ correct
 } from "@aws-sdk/client-sqs";
 
 import dotenv from "dotenv";
@@ -86,8 +86,8 @@ export async function deleteAllMessages() {
   if (!QUEUE_URL) throw new Error("Missing SQS_URL");
 
   await client.send(
-    new DeleteMessageAllCommand({
-      QueueUrl: QUEUE_URL, // ⭐ using env SQS_URL
+    new PurgeQueueCommand({
+      QueueUrl: QUEUE_URL,
     }),
   );
 

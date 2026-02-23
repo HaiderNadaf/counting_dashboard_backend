@@ -42,12 +42,21 @@ app.get("/message", (req, res) => {
 });
 
 /** fetch next */
+// app.post("/fetch", async (req, res) => {
+//   try {
+//     const existing = getMessage();
+//     if (existing) return res.json(existing);
+
+//     const msg = await pollSQS();
+//     res.json(msg);
+//   } catch (e) {
+//     res.status(500).json({ error: e.message });
+//   }
+// });
+
 app.post("/fetch", async (req, res) => {
   try {
-    const existing = getMessage();
-    if (existing) return res.json(existing);
-
-    const msg = await pollSQS();
+    const msg = await pollSQS(); // ⭐ always poll fresh
     res.json(msg);
   } catch (e) {
     res.status(500).json({ error: e.message });
@@ -94,11 +103,12 @@ app.get("/approvals", async (req, res) => {
 /** delete all messages */
 app.post("/deleteAll", async (req, res) => {
   try {
-    await deleteAllMessages();
+    await deleteAllMessages(); // this now uses PurgeQueueCommand
 
     res.json({
       ok: true,
-      queue: process.env.SQS_URL, // optional debug
+      message: "Queue purge requested (may take up to 60s)", // ⭐ important note
+      queue: process.env.SQS_URL,
     });
   } catch (e) {
     res.status(500).json({ error: e.message });
