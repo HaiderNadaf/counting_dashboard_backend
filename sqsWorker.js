@@ -27,7 +27,7 @@ export async function pollSQS() {
       QueueUrl: QUEUE_URL,
       MaxNumberOfMessages: 1,
       WaitTimeSeconds: 10,
-      VisibilityTimeout: 60,
+      VisibilityTimeout: 10,
     }),
   );
 
