@@ -3,8 +3,9 @@ import {
   SQSClient,
   ReceiveMessageCommand,
   DeleteMessageCommand,
+  DeleteMessageAllCommand,
 } from "@aws-sdk/client-sqs";
-import { DeleteMessageAllCommand } from "@aws-sdk/client-sqs";
+
 import dotenv from "dotenv";
 
 dotenv.config();
