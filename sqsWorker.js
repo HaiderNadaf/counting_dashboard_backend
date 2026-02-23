@@ -4,6 +4,7 @@ import {
   ReceiveMessageCommand,
   DeleteMessageCommand,
 } from "@aws-sdk/client-sqs";
+import { DeleteMessageAllCommand } from "@aws-sdk/client-sqs";
 import dotenv from "dotenv";
 
 dotenv.config();
@@ -81,35 +82,15 @@ export async function approveMessage(receipt) {
 
 // ⭐ delete all messages
 export async function deleteAllMessages() {
-  let deleted = 0;
+  if (!QUEUE_URL) throw new Error("Missing SQS_URL");
 
-  while (true) {
-    const res = await client.send(
-      new ReceiveMessageCommand({
-        QueueUrl: QUEUE_URL,
-        MaxNumberOfMessages: 10, // max batch
-        WaitTimeSeconds: 0,
-        VisibilityTimeout: 30,
-      }),
-    );
-
-    if (!res.Messages?.length) break;
-
-    for (const msg of res.Messages) {
-      await client.send(
-        new DeleteMessageCommand({
-          QueueUrl: QUEUE_URL,
-          ReceiptHandle: msg.ReceiptHandle,
-        }),
-      );
-
-      deleted++;
-    }
-  }
+  await client.send(
+    new DeleteMessageAllCommand({
+      QueueUrl: QUEUE_URL, // ⭐ using env SQS_URL
+    }),
+  );
 
   latestMessage = null;
 
-  console.log("Deleted all messages:", deleted);
-
-  return deleted;
+  console.log("Queue purged using SQS_URL");
 }

@@ -94,11 +94,11 @@ app.get("/approvals", async (req, res) => {
 /** delete all messages */
 app.post("/deleteAll", async (req, res) => {
   try {
-    const count = await deleteAllMessages();
+    await deleteAllMessages();
 
     res.json({
       ok: true,
-      deleted: count,
+      queue: process.env.SQS_URL, // optional debug
     });
   } catch (e) {
     res.status(500).json({ error: e.message });
