@@ -27,7 +27,7 @@ export async function pollSQS() {
       QueueUrl: QUEUE_URL,
       MaxNumberOfMessages: 1,
       WaitTimeSeconds: 10,
-      VisibilityTimeout: 10,
+      VisibilityTimeout: 120,
     }),
   );
 
@@ -54,16 +54,43 @@ export function getMessage() {
 }
 
 /** Delete message */
+
+// export async function approveMessage(receipt) {
+//   if (!receipt) throw new Error("Missing receipt handle");
+
+//   await client.send(
+//     new DeleteMessageCommand({
+//       QueueUrl: QUEUE_URL,
+//       ReceiptHandle: receipt,
+//     }),
+//   );
+
+//   latestMessage = null; // ⭐ IMPORTANT
+//   console.log("Deleted message");
+// }
+
 export async function approveMessage(receipt) {
   if (!receipt) throw new Error("Missing receipt handle");
 
-  await client.send(
-    new DeleteMessageCommand({
-      QueueUrl: QUEUE_URL,
-      ReceiptHandle: receipt,
-    }),
-  );
+  try {
+    await client.send(
+      new DeleteMessageCommand({
+        QueueUrl: QUEUE_URL,
+        ReceiptHandle: receipt,
+      }),
+    );
 
-  latestMessage = null; // ⭐ IMPORTANT
-  console.log("Deleted message");
+    latestMessage = null;
+    console.log("Deleted message");
+  } catch (e) {
+    console.log("Delete failed:", e.message);
+
+    // ⭐ if receipt expired → repoll
+    if (e.message?.includes("ReceiptHandle")) {
+      console.log("Receipt expired → repolling SQS");
+      await pollSQS();
+    }
+
+    throw e;
+  }
 }
