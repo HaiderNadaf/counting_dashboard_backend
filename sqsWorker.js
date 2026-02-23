@@ -28,7 +28,7 @@ export async function pollSQS() {
     new ReceiveMessageCommand({
       QueueUrl: QUEUE_URL,
       MaxNumberOfMessages: 1,
-      WaitTimeSeconds: 10,
+      WaitTimeSeconds: 0,
       VisibilityTimeout: 120,
     }),
   );
