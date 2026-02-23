@@ -53,22 +53,6 @@ export function getMessage() {
   return latestMessage;
 }
 
-/** Delete message */
-
-// export async function approveMessage(receipt) {
-//   if (!receipt) throw new Error("Missing receipt handle");
-
-//   await client.send(
-//     new DeleteMessageCommand({
-//       QueueUrl: QUEUE_URL,
-//       ReceiptHandle: receipt,
-//     }),
-//   );
-
-//   latestMessage = null; // ⭐ IMPORTANT
-//   console.log("Deleted message");
-// }
-
 export async function approveMessage(receipt) {
   if (!receipt) throw new Error("Missing receipt handle");
 
@@ -93,4 +77,39 @@ export async function approveMessage(receipt) {
 
     throw e;
   }
+}
+
+// ⭐ delete all messages
+export async function deleteAllMessages() {
+  let deleted = 0;
+
+  while (true) {
+    const res = await client.send(
+      new ReceiveMessageCommand({
+        QueueUrl: QUEUE_URL,
+        MaxNumberOfMessages: 10, // max batch
+        WaitTimeSeconds: 0,
+        VisibilityTimeout: 30,
+      }),
+    );
+
+    if (!res.Messages?.length) break;
+
+    for (const msg of res.Messages) {
+      await client.send(
+        new DeleteMessageCommand({
+          QueueUrl: QUEUE_URL,
+          ReceiptHandle: msg.ReceiptHandle,
+        }),
+      );
+
+      deleted++;
+    }
+  }
+
+  latestMessage = null;
+
+  console.log("Deleted all messages:", deleted);
+
+  return deleted;
 }

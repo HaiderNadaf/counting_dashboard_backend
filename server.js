@@ -7,7 +7,12 @@ import path from "path";
 
 dotenv.config();
 
-import { pollSQS, getMessage, approveMessage } from "./sqsWorker.js";
+import {
+  pollSQS,
+  getMessage,
+  approveMessage,
+  deleteAllMessages,
+} from "./sqsWorker.js";
 
 const app = express();
 app.use(cors());
@@ -84,6 +89,20 @@ app.post("/approve", async (req, res) => {
 /** approvals list */
 app.get("/approvals", async (req, res) => {
   res.json(await readApprovals());
+});
+
+/** delete all messages */
+app.post("/deleteAll", async (req, res) => {
+  try {
+    const count = await deleteAllMessages();
+
+    res.json({
+      ok: true,
+      deleted: count,
+    });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
 });
 
 app.listen(PORT, () => console.log("Server running", PORT));
