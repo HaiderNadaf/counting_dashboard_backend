@@ -4,8 +4,11 @@ import cors from "cors";
 import dotenv from "dotenv";
 import fs from "fs/promises";
 import path from "path";
+import { connectDB } from "./db.js";
+import Approval from "./models/Approval.js";
 
 dotenv.config();
+connectDB();
 
 import {
   pollSQS,
@@ -55,40 +58,84 @@ app.post("/fetch", async (req, res) => {
 });
 
 /** approve */
+// app.post("/approve", async (req, res) => {
+//   try {
+//     const { approver, message } = req.body;
+
+//     if (!message?.receipt) {
+//       return res.status(400).json({ error: "No message provided" });
+//     }
+
+//     await approveMessage(message.receipt);
+
+//     const record = {
+//       messageId: message.id,
+//       body: message.body,
+//       approver: approver || "unknown",
+//       approvedAt: new Date().toISOString(),
+//     };
+
+//     await saveApproval(record);
+
+//     const next = await pollSQS();
+
+//     res.json({
+//       ok: true,
+//       approved: record,
+//       next,
+//     });
+//   } catch (e) {
+//     res.status(500).json({ error: e.message });
+//   }
+// });
 app.post("/approve", async (req, res) => {
   try {
-    const { approver, message } = req.body;
+    const { message, approvedValue } = req.body;
 
-    if (!message?.receipt) {
-      return res.status(400).json({ error: "No message provided" });
-    }
+    if (!message?.receipt) return res.status(400).json({ error: "No message" });
+
+    const parsed = message.body;
 
     await approveMessage(message.receipt);
 
-    const record = {
+    const record = await Approval.create({
       messageId: message.id,
-      body: message.body,
-      approver: approver || "unknown",
-      approvedAt: new Date().toISOString(),
-    };
-
-    await saveApproval(record);
+      truck_number: parsed?.truck_number,
+      original_count: Number(parsed?.count),
+      approved_count: Number(approvedValue),
+    });
 
     const next = await pollSQS();
 
-    res.json({
-      ok: true,
-      approved: record,
-      next,
-    });
+    res.json({ ok: true, record, next });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.put("/approval/:id", async (req, res) => {
+  try {
+    const { approved_count } = req.body;
+
+    const updated = await Approval.findByIdAndUpdate(
+      req.params.id,
+      { approved_count },
+      { new: true },
+    );
+
+    res.json(updated);
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
 });
 
 /** approvals list */
+// app.get("/approvals", async (req, res) => {
+//   res.json(await readApprovals());
+// });
 app.get("/approvals", async (req, res) => {
-  res.json(await readApprovals());
+  const list = await Approval.find().sort({ createdAt: -1 });
+  res.json(list);
 });
 
 /** delete all messages */
@@ -101,6 +148,45 @@ app.post("/deleteAll", async (req, res) => {
       message: "Queue purge requested (may take up to 60s)", // ⭐ important note
       queue: process.env.SQS_URL,
     });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+/** total count  */
+app.get("/totals/today", async (req, res) => {
+  try {
+    const start = new Date();
+    start.setHours(0, 0, 0, 0);
+
+    const end = new Date();
+    end.setHours(23, 59, 59, 999);
+
+    const data = await Approval.aggregate([
+      {
+        $match: {
+          createdAt: { $gte: start, $lte: end },
+        },
+      },
+      {
+        $group: {
+          _id: "$truck_number",
+          totalApproved: { $sum: "$approved_count" },
+          entries: { $sum: 1 },
+        },
+      },
+      {
+        $project: {
+          truck_number: "$_id",
+          totalApproved: 1,
+          entries: 1,
+          _id: 0,
+        },
+      },
+      { $sort: { totalApproved: -1 } },
+    ]);
+
+    res.json(data);
   } catch (e) {
     res.status(500).json({ error: e.message });
   }

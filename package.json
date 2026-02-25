@@ -1,11 +1,11 @@
 {
   "name": "backend",
   "version": "1.0.0",
- "main": "server.js",
- "scripts": {
-  "dev": "nodemon server.js",
-  "start": "node server.js"
-},
+  "main": "server.js",
+  "scripts": {
+    "dev": "nodemon server.js",
+    "start": "node server.js"
+  },
   "keywords": [],
   "author": "",
   "license": "ISC",
@@ -14,7 +14,8 @@
     "@aws-sdk/client-sqs": "^3.995.0",
     "cors": "^2.8.6",
     "dotenv": "^17.3.1",
-    "express": "^5.2.1"
+    "express": "^5.2.1",
+    "mongoose": "^9.2.2"
   },
   "devDependencies": {
     "nodemon": "^3.1.14"
