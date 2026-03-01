@@ -195,10 +195,12 @@ app.post("/deleteAll", async (req, res) => {
 
 app.get("/totals/today", async (req, res) => {
   try {
-    const start = new Date();
+    const today = new Date().toISOString().split("T")[0];
+
+    const start = new Date(today);
     start.setHours(0, 0, 0, 0);
 
-    const end = new Date();
+    const end = new Date(today);
     end.setHours(23, 59, 59, 999);
 
     const data = await Approval.aggregate([
@@ -222,28 +224,71 @@ app.get("/totals/today", async (req, res) => {
           _id: 0,
         },
       },
-      { $sort: { totalApproved: -1 } },
     ]);
 
-    // 🔥 Delete old records for today (avoid duplicates)
-    await TodayTotal.deleteMany({
-      date: { $gte: start, $lte: end },
-    });
+    const results = [];
 
-    // 🔥 Insert fresh aggregated data
-    const formattedData = data.map((item) => ({
-      ...item,
-      date: start,
-    }));
+    for (const item of data) {
+      const updated = await TodayTotal.findOneAndUpdate(
+        {
+          truck_number: item.truck_number,
+          date: today,
+        },
+        {
+          $set: {
+            totalApproved: item.totalApproved,
+            entries: item.entries,
+          },
+          $setOnInsert: {
+            sqsCountComplete: false, // only when first created
+          },
+        },
+        {
+          new: true,
+          upsert: true, // 🔥 KEY FIX
+        },
+      );
 
-    await TodayTotal.insertMany(formattedData);
+      results.push(updated);
+    }
 
     res.json({
-      message: "Today's totals saved successfully",
-      data,
+      message: "Today's totals synced successfully",
+      data: results,
     });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
 });
+
+app.put("/totals/complete", async (req, res) => {
+  try {
+    const { date, truck_number } = req.body;
+
+    if (!date || !truck_number) {
+      return res.status(400).json({ error: "Date and truck_number required" });
+    }
+
+    const updated = await TodayTotal.findOneAndUpdate(
+      {
+        truck_number,
+        date, // exact match string
+      },
+      { sqsCountComplete: true },
+      { new: true },
+    );
+
+    if (!updated) {
+      return res.status(404).json({ error: "Record not found" });
+    }
+
+    res.json({
+      message: "SQS Count marked complete ✅",
+      data: updated,
+    });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 app.listen(PORT, () => console.log("Server running", PORT));
