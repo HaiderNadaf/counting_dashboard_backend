@@ -6,6 +6,7 @@ import fs from "fs/promises";
 import path from "path";
 import { connectDB } from "./db.js";
 import Approval from "./models/Approval.js";
+import TodayTotal from "./models/TodayTotal.js";
 
 dotenv.config();
 connectDB();
@@ -154,6 +155,44 @@ app.post("/deleteAll", async (req, res) => {
 });
 
 /** total count  */
+// app.get("/totals/today", async (req, res) => {
+//   try {
+//     const start = new Date();
+//     start.setHours(0, 0, 0, 0);
+
+//     const end = new Date();
+//     end.setHours(23, 59, 59, 999);
+
+//     const data = await Approval.aggregate([
+//       {
+//         $match: {
+//           createdAt: { $gte: start, $lte: end },
+//         },
+//       },
+//       {
+//         $group: {
+//           _id: "$truck_number",
+//           totalApproved: { $sum: "$approved_count" },
+//           entries: { $sum: 1 },
+//         },
+//       },
+//       {
+//         $project: {
+//           truck_number: "$_id",
+//           totalApproved: 1,
+//           entries: 1,
+//           _id: 0,
+//         },
+//       },
+//       { $sort: { totalApproved: -1 } },
+//     ]);
+
+//     res.json(data);
+//   } catch (e) {
+//     res.status(500).json({ error: e.message });
+//   }
+// });
+
 app.get("/totals/today", async (req, res) => {
   try {
     const start = new Date();
@@ -186,10 +225,25 @@ app.get("/totals/today", async (req, res) => {
       { $sort: { totalApproved: -1 } },
     ]);
 
-    res.json(data);
+    // 🔥 Delete old records for today (avoid duplicates)
+    await TodayTotal.deleteMany({
+      date: { $gte: start, $lte: end },
+    });
+
+    // 🔥 Insert fresh aggregated data
+    const formattedData = data.map((item) => ({
+      ...item,
+      date: start,
+    }));
+
+    await TodayTotal.insertMany(formattedData);
+
+    res.json({
+      message: "Today's totals saved successfully",
+      data,
+    });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
 });
-
 app.listen(PORT, () => console.log("Server running", PORT));
