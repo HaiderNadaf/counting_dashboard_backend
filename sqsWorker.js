@@ -140,7 +140,7 @@ export async function pollSQS() {
       QueueUrl: QUEUE_URL,
       MaxNumberOfMessages: 1,
       WaitTimeSeconds: 10,
-      VisibilityTimeout: 1800,
+      VisibilityTimeout: 60,
     }),
   );
 
