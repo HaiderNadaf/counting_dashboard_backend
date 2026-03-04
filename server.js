@@ -48,6 +48,9 @@ app.get("/message", (req, res) => {
 /** fetch next */
 app.post("/fetch", async (req, res) => {
   try {
+    const existing = getMessage();
+    if (existing) return res.json(existing);
+
     const msg = await pollSQS();
     res.json(msg);
   } catch (e) {

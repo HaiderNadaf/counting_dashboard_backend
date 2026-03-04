@@ -95,7 +95,6 @@
 
 //   console.log("Queue purged using SQS_URL");
 // }
-
 import {
   SQSClient,
   ReceiveMessageCommand,
@@ -135,64 +134,32 @@ function parseBody(body) {
 }
 
 /** poll */
-// export async function pollSQS() {
-//   const res = await client.send(
-//     new ReceiveMessageCommand({
-//       QueueUrl: QUEUE_URL,
-//       MaxNumberOfMessages: 1,
-//       WaitTimeSeconds: 10,
-//       VisibilityTimeout: 60,
-//     }),
-//   );
-
-//   if (!res.Messages?.length) {
-//     latestMessage = null;
-//     return null;
-//   }
-
-//   const msg = res.Messages[0];
-
-//   latestMessage = {
-//     id: msg.MessageId,
-//     body: parseBody(msg.Body), // ⭐ IMPORTANT → object now
-//     receipt: msg.ReceiptHandle,
-//   };
-
-//   return latestMessage;
-// }
-
 export async function pollSQS() {
-  console.log("Polling SQS...");
-
   const res = await client.send(
     new ReceiveMessageCommand({
       QueueUrl: QUEUE_URL,
       MaxNumberOfMessages: 1,
-      WaitTimeSeconds: 10,
-      VisibilityTimeout: 60,
+      WaitTimeSeconds: 5,
+      VisibilityTimeout: 900,
     }),
   );
 
-  console.log("RAW SQS RESPONSE:", JSON.stringify(res, null, 2));
-
-  if (!res.Messages || res.Messages.length === 0) {
-    console.log("❌ NO MESSAGES RECEIVED FROM SQS");
+  if (!res.Messages?.length) {
     latestMessage = null;
     return null;
   }
-
-  console.log("✅ MESSAGE RECEIVED");
 
   const msg = res.Messages[0];
 
   latestMessage = {
     id: msg.MessageId,
-    body: parseBody(msg.Body),
+    body: parseBody(msg.Body), // ⭐ IMPORTANT → object now
     receipt: msg.ReceiptHandle,
   };
 
   return latestMessage;
 }
+
 export function getMessage() {
   return latestMessage;
 }
