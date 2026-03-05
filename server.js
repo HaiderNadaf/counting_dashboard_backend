@@ -41,14 +41,14 @@ async function saveApproval(obj) {
 }
 
 /** cached message */
-app.get("/message", async (req, res) => {
-  res.json(await getMessage());
+app.get("/message", (req, res) => {
+  res.json(getMessage());
 });
 
 /** fetch next */
 app.post("/fetch", async (req, res) => {
   try {
-    const existing = await getMessage();
+    const existing = getMessage();
     if (existing) return res.json(existing);
 
     const msg = await pollSQS();
@@ -106,7 +106,6 @@ app.post("/approve", async (req, res) => {
       approved_count: Number(approvedValue),
     });
 
-    // Poll for next message from queue
     const next = await pollSQS();
 
     res.json({ ok: true, record, next });
