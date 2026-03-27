@@ -590,7 +590,7 @@ app.post("/deleteAll", async (req, res) => {
   }
 });
 
-/** changed the totals/today to totals/counts */
+/** changed the totals/today to into totals/counts */
 // app.get("/totals/today", async (req, res) => {
 //   try {
 //     const today = new Date().toISOString().split("T")[0];
