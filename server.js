@@ -641,18 +641,8 @@ app.get("/totals/counts", async (req, res) => {
   try {
     const date =
       normalizeDateKey(req.query.date) || new Date().toISOString().slice(0, 10);
-    const start = new Date(`${date}T00:00:00.000Z`);
-    const end = new Date(`${date}T23:59:59.999Z`);
 
     const data = await Approval.aggregate([
-      {
-        $match: {
-          createdAt: {
-            $gte: start,
-            $lte: end,
-          },
-        },
-      },
       {
         $group: {
           _id: "$truck_number",
@@ -697,7 +687,7 @@ app.get("/totals/counts", async (req, res) => {
     }
 
     res.json({
-      message: "Total counts synced successfully",
+      message: "All approval totals synced successfully",
       date,
       data: results,
     });
