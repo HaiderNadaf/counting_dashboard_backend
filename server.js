@@ -729,9 +729,12 @@ app.put("/totals/complete", async (req, res) => {
 
     if (totalApproved !== undefined) {
       const parsedTotalApproved = Number(totalApproved);
-      if (Number.isNaN(parsedTotalApproved) || parsedTotalApproved < 0) {
+
+      // Only check if it's a valid number
+      if (Number.isNaN(parsedTotalApproved)) {
         return res.status(400).json({ error: "Invalid totalApproved value" });
       }
+
       update.$set.totalApproved = parsedTotalApproved;
     }
 
