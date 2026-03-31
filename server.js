@@ -477,13 +477,48 @@ app.post("/fetch", async (req, res) => {
 });
 
 /** approve */
+// app.post("/approve", async (req, res) => {
+//   try {
+//     const { message, approvedValue } = req.body;
+//     if (!message?.receipt) {
+//       return res.status(400).json({ error: "No message provided" });
+//     }
+//     const parsed = message.body;
+//     try {
+//       await approveMessage(message.receipt);
+//     } catch (deleteError) {
+//       if (deleteError.message?.includes("expired")) {
+//         return res.status(410).json({
+//           error: "Message expired. Please fetch a new message.",
+//           expired: true,
+//         });
+//       }
+//       throw deleteError;
+//     }
+//     const record = await Approval.create({
+//       messageId: message.id,
+//       truck_number: parsed?.truck_number,
+//       original_count: Number(parsed?.count),
+//       approved_count: Number(approvedValue),
+//     });
+//     const next = await pollSQS();
+//     res.json({ ok: true, record, next });
+//   } catch (e) {
+//     console.error("❌ /approve error:", e.message);
+//     res.status(500).json({ error: e.message });
+//   }
+// });
+
 app.post("/approve", async (req, res) => {
   try {
     const { message, approvedValue } = req.body;
+
     if (!message?.receipt) {
       return res.status(400).json({ error: "No message provided" });
     }
+
     const parsed = message.body;
+
     try {
       await approveMessage(message.receipt);
     } catch (deleteError) {
@@ -495,13 +530,40 @@ app.post("/approve", async (req, res) => {
       }
       throw deleteError;
     }
+
+    // ✅ SAVE APPROVAL
     const record = await Approval.create({
       messageId: message.id,
       truck_number: parsed?.truck_number,
       original_count: Number(parsed?.count),
       approved_count: Number(approvedValue),
     });
+
+    // ✅ UPDATE TodayTotal AUTOMATICALLY
+    const date = new Date().toISOString().slice(0, 10);
+
+    await TodayTotal.findOneAndUpdate(
+      {
+        truck_number: record.truck_number,
+        date,
+      },
+      {
+        $inc: {
+          totalApproved: record.approved_count,
+          entries: 1,
+        },
+        $setOnInsert: {
+          sqsCountComplete: false,
+        },
+      },
+      {
+        upsert: true,
+        new: true,
+      },
+    );
+
     const next = await pollSQS();
+
     res.json({ ok: true, record, next });
   } catch (e) {
     console.error("❌ /approve error:", e.message);
@@ -637,22 +699,84 @@ app.post("/deleteAll", async (req, res) => {
 //   }
 // });
 
+// app.get("/totals/counts", async (req, res) => {
+//   try {
+//     const date =
+//       normalizeDateKey(req.query.date) || new Date().toISOString().slice(0, 10);
+
+//     const data = await Approval.aggregate([
+//       {
+//         $group: {
+//           _id: "$truck_number",
+//           totalApproved: { $sum: "$approved_count" },
+//           entries: { $sum: 1 },
+//         },
+//       },
+//       {
+//         $project: {
+//           truck_number: "$_id",
+//           totalApproved: 1,
+//           entries: 1,
+//           _id: 0,
+//         },
+//       },
+//     ]);
+
+//     const results = [];
+
+//     for (const item of data) {
+//       const updated = await TodayTotal.findOneAndUpdate(
+//         {
+//           truck_number: item.truck_number,
+//           date,
+//         },
+//         {
+//           $set: {
+//             totalApproved: item.totalApproved,
+//             entries: item.entries,
+//           },
+//           $setOnInsert: {
+//             sqsCountComplete: false,
+//           },
+//         },
+//         {
+//           new: true,
+//           upsert: true,
+//         },
+//       );
+
+//       results.push(updated);
+//     }
+
+//     res.json({
+//       message: "All approval totals synced successfully",
+//       date,
+//       data: results,
+//     });
+//   } catch (e) {
+//     res.status(500).json({ error: e.message });
+//   }
+// });
+
 app.get("/totals/counts", async (req, res) => {
   try {
-    const date =
-      normalizeDateKey(req.query.date) || new Date().toISOString().slice(0, 10);
-
     const data = await Approval.aggregate([
       {
         $group: {
-          _id: "$truck_number",
+          _id: {
+            truck_number: "$truck_number",
+            date: {
+              $dateToString: { format: "%Y-%m-%d", date: "$createdAt" },
+            },
+          },
           totalApproved: { $sum: "$approved_count" },
           entries: { $sum: 1 },
         },
       },
       {
         $project: {
-          truck_number: "$_id",
+          truck_number: "$_id.truck_number",
+          date: "$_id.date",
           totalApproved: 1,
           entries: 1,
           _id: 0,
@@ -663,32 +787,44 @@ app.get("/totals/counts", async (req, res) => {
     const results = [];
 
     for (const item of data) {
-      const updated = await TodayTotal.findOneAndUpdate(
-        {
-          truck_number: item.truck_number,
-          date,
-        },
-        {
-          $set: {
-            totalApproved: item.totalApproved,
-            entries: item.entries,
-          },
-          $setOnInsert: {
-            sqsCountComplete: false,
-          },
-        },
-        {
-          new: true,
-          upsert: true,
-        },
-      );
+      const existing = await TodayTotal.findOne({
+        truck_number: item.truck_number,
+        date: item.date,
+      });
 
-      results.push(updated);
+      const isChanged =
+        !existing ||
+        existing.totalApproved !== item.totalApproved ||
+        existing.entries !== item.entries;
+
+      let result;
+
+      if (isChanged) {
+        result = await TodayTotal.findOneAndUpdate(
+          {
+            truck_number: item.truck_number,
+            date: item.date,
+          },
+          {
+            $set: {
+              totalApproved: item.totalApproved,
+              entries: item.entries,
+            },
+            $setOnInsert: {
+              sqsCountComplete: false,
+            },
+          },
+          { new: true, upsert: true },
+        );
+      } else {
+        result = existing; // ✅ no update
+      }
+
+      results.push(result);
     }
 
     res.json({
-      message: "All approval totals synced successfully",
-      date,
+      message: "Saved + fetched all data",
       data: results,
     });
   } catch (e) {
