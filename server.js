@@ -524,12 +524,26 @@ app.get("/totals/counts", async (req, res) => {
       results.push(result);
     }
 
+    // ✅ GLOBAL STATS (ALL DATA, before pagination)
+    const totalSessions = results.length;
+
+    const completed = results.filter(
+      (item) => item?.sqsCountComplete === true,
+    ).length;
+
+    const pendingReports = totalSessions - completed;
     // ✅ PAGINATION
     const skip = (Number(page) - 1) * Number(limit);
     const paginatedResults = results.slice(skip, skip + Number(limit));
 
     res.json({
       message: "Saved + fetched all data",
+
+      stats: {
+        totalSessions,
+        completed,
+        pendingReports,
+      },
       total: results.length,
       page: Number(page),
       limit: Number(limit),
